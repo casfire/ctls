@@ -6,7 +6,7 @@ package tls
 
 import (
 	"crypto"
-	"crypto/ecdh"
+	"github.com/casfire/ctls/ecdh"
 	"crypto/md5"
 	"crypto/rsa"
 	"crypto/sha1"

@@ -8,7 +8,7 @@ import (
 	"bytes"
 	"context"
 	"crypto"
-	"crypto/ecdh"
+	"github.com/casfire/ctls/ecdh"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
