@@ -92,6 +92,7 @@ type clientHelloMsg struct {
 	pskModes                         []uint8
 	pskIdentities                    []pskIdentity
 	pskBinders                       [][]byte
+	extensions                       []uint16
 }
 
 func (m *clientHelloMsg) marshal() []byte {
@@ -121,173 +122,235 @@ func (m *clientHelloMsg) marshal() []byte {
 		bWithoutExtensions := *b
 
 		b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
-			if len(m.serverName) > 0 {
-				// RFC 6066, Section 3
-				b.AddUint16(extensionServerName)
-				b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
-					b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
-						b.AddUint8(0) // name_type = host_name
-						b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
-							b.AddBytes([]byte(m.serverName))
-						})
-					})
-				})
-			}
-			if m.ocspStapling {
-				// RFC 4366, Section 3.6
-				b.AddUint16(extensionStatusRequest)
-				b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
-					b.AddUint8(1)  // status_type = ocsp
-					b.AddUint16(0) // empty responder_id_list
-					b.AddUint16(0) // empty request_extensions
-				})
-			}
-			if len(m.supportedCurves) > 0 {
-				// RFC 4492, sections 5.1.1 and RFC 8446, Section 4.2.7
-				b.AddUint16(extensionSupportedCurves)
-				b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
-					b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
-						for _, curve := range m.supportedCurves {
-							b.AddUint16(uint16(curve))
-						}
-					})
-				})
-			}
-			if len(m.supportedPoints) > 0 {
-				// RFC 4492, Section 5.1.2
-				b.AddUint16(extensionSupportedPoints)
-				b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
-					b.AddUint8LengthPrefixed(func(b *cryptobyte.Builder) {
-						b.AddBytes(m.supportedPoints)
-					})
-				})
-			}
-			if m.ticketSupported {
-				// RFC 5077, Section 3.2
-				b.AddUint16(extensionSessionTicket)
-				b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
-					b.AddBytes(m.sessionTicket)
-				})
-			}
-			if len(m.supportedSignatureAlgorithms) > 0 {
-				// RFC 5246, Section 7.4.1.4.1
-				b.AddUint16(extensionSignatureAlgorithms)
-				b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
-					b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
-						for _, sigAlgo := range m.supportedSignatureAlgorithms {
-							b.AddUint16(uint16(sigAlgo))
-						}
-					})
-				})
-			}
-			if len(m.supportedSignatureAlgorithmsCert) > 0 {
-				// RFC 8446, Section 4.2.3
-				b.AddUint16(extensionSignatureAlgorithmsCert)
-				b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
-					b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
-						for _, sigAlgo := range m.supportedSignatureAlgorithmsCert {
-							b.AddUint16(uint16(sigAlgo))
-						}
-					})
-				})
-			}
-			if m.secureRenegotiationSupported {
-				// RFC 5746, Section 3.2
-				b.AddUint16(extensionRenegotiationInfo)
-				b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
-					b.AddUint8LengthPrefixed(func(b *cryptobyte.Builder) {
-						b.AddBytes(m.secureRenegotiation)
-					})
-				})
-			}
-			if len(m.alpnProtocols) > 0 {
-				// RFC 7301, Section 3.1
-				b.AddUint16(extensionALPN)
-				b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
-					b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
-						for _, proto := range m.alpnProtocols {
-							b.AddUint8LengthPrefixed(func(b *cryptobyte.Builder) {
-								b.AddBytes([]byte(proto))
-							})
-						}
-					})
-				})
-			}
-			if m.scts {
-				// RFC 6962, Section 3.3.1
-				b.AddUint16(extensionSCT)
-				b.AddUint16(0) // empty extension_data
-			}
-			if len(m.supportedVersions) > 0 {
-				// RFC 8446, Section 4.2.1
-				b.AddUint16(extensionSupportedVersions)
-				b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
-					b.AddUint8LengthPrefixed(func(b *cryptobyte.Builder) {
-						for _, vers := range m.supportedVersions {
-							b.AddUint16(vers)
-						}
-					})
-				})
-			}
-			if len(m.cookie) > 0 {
-				// RFC 8446, Section 4.2.2
-				b.AddUint16(extensionCookie)
-				b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
-					b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
-						b.AddBytes(m.cookie)
-					})
-				})
-			}
-			if len(m.keyShares) > 0 {
-				// RFC 8446, Section 4.2.8
-				b.AddUint16(extensionKeyShare)
-				b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
-					b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
-						for _, ks := range m.keyShares {
-							b.AddUint16(uint16(ks.group))
+			for _, ext := range m.extensions {
+				switch ext {
+					case 0:
+						// server_name
+						if len(m.serverName) > 0 {
+							b.AddUint16(extensionServerName)
 							b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
-								b.AddBytes(ks.data)
+								b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+									b.AddUint8(0) // name_type = host_name
+									b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+										b.AddBytes([]byte(m.serverName))
+									})
+								})
 							})
+						} else {
+							panic("No server name")
 						}
-					})
-				})
-			}
-			if m.earlyData {
-				// RFC 8446, Section 4.2.10
-				b.AddUint16(extensionEarlyData)
-				b.AddUint16(0) // empty extension_data
-			}
-			if len(m.pskModes) > 0 {
-				// RFC 8446, Section 4.2.9
-				b.AddUint16(extensionPSKModes)
-				b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
-					b.AddUint8LengthPrefixed(func(b *cryptobyte.Builder) {
-						b.AddBytes(m.pskModes)
-					})
-				})
-			}
-			if len(m.pskIdentities) > 0 { // pre_shared_key must be the last extension
-				// RFC 8446, Section 4.2.11
-				b.AddUint16(extensionPreSharedKey)
-				b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
-					b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
-						for _, psk := range m.pskIdentities {
+					case 5:
+						// status_request
+						if m.ocspStapling {
+							b.AddUint16(extensionStatusRequest)
 							b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
-								b.AddBytes(psk.label)
+								b.AddUint8(1)  // status_type = ocsp
+								b.AddUint16(0) // empty responder_id_list
+								b.AddUint16(0) // empty request_extensions
 							})
-							b.AddUint32(psk.obfuscatedTicketAge)
+						} else {
+							panic("OCSP disabled")
 						}
-					})
-					b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
-						for _, binder := range m.pskBinders {
-							b.AddUint8LengthPrefixed(func(b *cryptobyte.Builder) {
-								b.AddBytes(binder)
+					case 10:
+						// supported_groups
+						if len(m.supportedCurves) > 0 {
+							b.AddUint16(extensionSupportedCurves)
+							b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+								b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+									for _, curve := range m.supportedCurves {
+										b.AddUint16(uint16(curve))
+									}
+								})
 							})
+						} else {
+							panic("No supported groups")
 						}
-					})
-				})
+					case 11:
+						// ec_point_formats
+						if len(m.supportedPoints) > 0 {
+							b.AddUint16(extensionSupportedPoints)
+							b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+								b.AddUint8LengthPrefixed(func(b *cryptobyte.Builder) {
+									b.AddBytes(m.supportedPoints)
+								})
+							})
+						} else {
+							panic("No supported points")
+						}
+					case 13:
+						// signature_algorithms
+						if len(m.supportedSignatureAlgorithms) > 0 {
+							b.AddUint16(extensionSignatureAlgorithms)
+							b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+								b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+									for _, sigAlgo := range m.supportedSignatureAlgorithms {
+										b.AddUint16(uint16(sigAlgo))
+									}
+								})
+							})
+						} else {
+							panic("No signature algorithms")
+						}
+					case 16:
+						// application_layer_protocol_negotiation
+						if len(m.alpnProtocols) > 0 {
+							b.AddUint16(extensionALPN)
+							b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+								b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+									for _, proto := range m.alpnProtocols {
+										b.AddUint8LengthPrefixed(func(b *cryptobyte.Builder) {
+											b.AddBytes([]byte(proto))
+										})
+									}
+								})
+							})
+						} else {
+							panic("No ALPN protocols")
+						}
+					case 18:
+						// signed_certificate_timestamp
+						if m.scts {
+							b.AddUint16(extensionSCT)
+							b.AddUint16(0) // empty extension_data
+						} else {
+							panic("SCT disabled")
+						}
+					case 21:
+						// padding
+						b.AddUint16(21)
+						b.AddUint16(0)
+						// TODO Add padding bytes
+					case 27:
+						// compress_certificate
+						b.AddUint16(27)
+						b.AddUint16(0)
+						// TODO Add compression algorithms
+					case 35:
+						// session_ticket
+						if m.ticketSupported {
+							b.AddUint16(extensionSessionTicket)
+							b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+								b.AddBytes(m.sessionTicket)
+							})
+						} else {
+							panic("Session ticket not supported")
+						}
+					case 41:
+						if len(m.pskIdentities) > 0 { // pre_shared_key must be the last extension
+							b.AddUint16(extensionPreSharedKey)
+							b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+								b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+									for _, psk := range m.pskIdentities {
+										b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+											b.AddBytes(psk.label)
+										})
+										b.AddUint32(psk.obfuscatedTicketAge)
+									}
+								})
+								b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+									for _, binder := range m.pskBinders {
+										b.AddUint8LengthPrefixed(func(b *cryptobyte.Builder) {
+											b.AddBytes(binder)
+										})
+									}
+								})
+							})
+						} else {
+							panic("No PSK identities")
+						}
+					case 42:
+						if m.earlyData {
+							b.AddUint16(extensionEarlyData)
+							b.AddUint16(0) // empty extension_data
+						} else {
+							panic("No early data")
+						}
+					case 43:
+						// supported_versions
+						if len(m.supportedVersions) > 0 {
+							b.AddUint16(extensionSupportedVersions)
+							b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+								b.AddUint8LengthPrefixed(func(b *cryptobyte.Builder) {
+									for _, vers := range m.supportedVersions {
+										b.AddUint16(vers)
+									}
+								})
+							})
+						} else {
+							panic("No supported versions")
+						}
+					case 44:
+						if len(m.cookie) > 0 {
+							b.AddUint16(extensionCookie)
+							b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+								b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+									b.AddBytes(m.cookie)
+								})
+							})
+						} else {
+							panic("No cookie")
+						}
+					
+					case 45:
+						// psk_key_exchange_modes
+						if len(m.pskModes) > 0 {
+							b.AddUint16(extensionPSKModes)
+							b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+								b.AddUint8LengthPrefixed(func(b *cryptobyte.Builder) {
+									b.AddBytes(m.pskModes)
+								})
+							})
+						} else {
+							panic("No PSK modes")
+						}
+					case 50:
+						if len(m.supportedSignatureAlgorithmsCert) > 0 {
+							b.AddUint16(extensionSignatureAlgorithmsCert)
+							b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+								b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+									for _, sigAlgo := range m.supportedSignatureAlgorithmsCert {
+										b.AddUint16(uint16(sigAlgo))
+									}
+								})
+							})
+						} else {
+							panic("No supported signature algorithms")
+						}
+					case 51:
+						// key_share
+						if len(m.keyShares) > 0 {
+							b.AddUint16(extensionKeyShare)
+							b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+								b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+									for _, ks := range m.keyShares {
+										b.AddUint16(uint16(ks.group))
+										b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+											b.AddBytes(ks.data)
+										})
+									}
+								})
+							})
+						} else {
+							panic("No key shares")
+						}
+					case 65281:
+						// renegotiation_info
+						if m.secureRenegotiationSupported {
+							b.AddUint16(extensionRenegotiationInfo)
+							b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+								b.AddUint8LengthPrefixed(func(b *cryptobyte.Builder) {
+									b.AddBytes(m.secureRenegotiation)
+								})
+							})
+						} else {
+							panic("Secure renegotiation not supported")
+						}
+					default:
+						// generic extension
+						b.AddUint16(ext)
+						b.AddUint16(0)
+				}
 			}
-
 			extensionsPresent = len(b.BytesOrPanic()) > 2
 		})
 
@@ -612,7 +675,7 @@ type serverHelloMsg struct {
 	selectedIdentityPresent      bool
 	selectedIdentity             uint16
 	supportedPoints              []uint8
-
+	
 	// HelloRetryRequest extensions
 	cookie        []byte
 	selectedGroup CurveID

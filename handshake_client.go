@@ -80,13 +80,17 @@ func (c *Conn) makeClientHello() (*clientHelloMsg, *ecdh.PrivateKey, error) {
 		secureRenegotiationSupported: true,
 		alpnProtocols:                config.NextProtos,
 		supportedVersions:            supportedVersions,
+		extensions:                   config.Extensions,
+		ticketSupported:              true,
+		pskModes:                     []uint8{pskModeDHE},
+		cipherSuites:                 config.cipherSuites(),
 	}
 
 	if c.handshakes > 0 {
 		hello.secureRenegotiation = c.clientFinished[:]
 	}
 
-	preferenceOrder := cipherSuitesPreferenceOrder
+	/*preferenceOrder := cipherSuitesPreferenceOrder
 	if !hasAESGCMHardwareSupport {
 		preferenceOrder = cipherSuitesPreferenceOrderNoAES
 	}
@@ -104,8 +108,8 @@ func (c *Conn) makeClientHello() (*clientHelloMsg, *ecdh.PrivateKey, error) {
 			continue
 		}
 		hello.cipherSuites = append(hello.cipherSuites, suiteId)
-	}
-
+	}*/
+	
 	_, err := io.ReadFull(config.rand(), hello.random)
 	if err != nil {
 		return nil, nil, errors.New("tls: short read from Rand: " + err.Error())
@@ -126,12 +130,12 @@ func (c *Conn) makeClientHello() (*clientHelloMsg, *ecdh.PrivateKey, error) {
 	}
 
 	var key *ecdh.PrivateKey
-	if hello.supportedVersions[0] == VersionTLS13 {
-		if hasAESGCMHardwareSupport {
+	//if hello.supportedVersions[0] == VersionTLS13 {
+		/*if hasAESGCMHardwareSupport {
 			hello.cipherSuites = append(hello.cipherSuites, defaultCipherSuitesTLS13...)
 		} else {
 			hello.cipherSuites = append(hello.cipherSuites, defaultCipherSuitesTLS13NoAES...)
-		}
+		}*/
 
 		curveID := config.curvePreferences()[0]
 		if _, ok := curveForCurveID(curveID); !ok {
@@ -142,8 +146,8 @@ func (c *Conn) makeClientHello() (*clientHelloMsg, *ecdh.PrivateKey, error) {
 			return nil, nil, err
 		}
 		hello.keyShares = []keyShare{{group: curveID, data: key.PublicKey().Bytes()}}
-	}
-
+	//}
+	
 	return hello, key, nil
 }
 

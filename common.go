@@ -651,6 +651,9 @@ type Config struct {
 	// If CipherSuites is nil, a safe default list is used. The default cipher
 	// suites might change over time.
 	CipherSuites []uint16
+	
+	// List of extensions
+	Extensions []uint16
 
 	// PreferServerCipherSuites is a legacy field and has no effect.
 	//
