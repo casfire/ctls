@@ -14,8 +14,8 @@ package boring
 */
 import "C"
 import (
-	"crypto/internal/boring/sig"
-	_ "crypto/internal/boring/syso"
+	"github.com/casfire/ctls/boring/sig"
+	_ "github.com/casfire/ctls/boring/syso"
 	"math/bits"
 	"unsafe"
 )

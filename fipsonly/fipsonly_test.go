@@ -7,7 +7,7 @@
 package fipsonly
 
 import (
-	"crypto/internal/boring/fipstls"
+	"github.com/casfire/ctls/boring/fipstls"
 	"testing"
 )
 

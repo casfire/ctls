@@ -5,7 +5,7 @@
 package bbig
 
 import (
-	"crypto/internal/boring"
+	"github.com/casfire/ctls/boring"
 	"math/big"
 	"unsafe"
 )
