@@ -6,7 +6,7 @@ package ecdh
 
 import (
 	"crypto/internal/nistec"
-	"crypto/internal/randutil"
+	"github.com/casfire/ctls/randutil"
 	"encoding/binary"
 	"errors"
 	"io"

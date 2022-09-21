@@ -6,7 +6,7 @@ package ecdh
 
 import (
 	"crypto/internal/edwards25519/field"
-	"crypto/internal/randutil"
+	"github.com/casfire/ctls/randutil"
 	"errors"
 	"io"
 )
