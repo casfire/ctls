@@ -6,7 +6,7 @@ package cpu_test
 
 import (
 	"errors"
-	. "internal/cpu"
+	. "github.com/casfire/ctls/cpu"
 	"os"
 	"regexp"
 	"testing"

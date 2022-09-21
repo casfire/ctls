@@ -7,7 +7,7 @@
 package cpu_test
 
 import (
-	. "internal/cpu"
+	. "github.com/casfire/ctls/cpu"
 	"internal/godebug"
 	"testing"
 )
