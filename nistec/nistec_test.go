@@ -7,7 +7,7 @@ package nistec_test
 import (
 	"bytes"
 	"crypto/elliptic"
-	"crypto/internal/nistec"
+	"github.com/casfire/ctls/nistec"
 	"internal/testenv"
 	"math/big"
 	"math/rand"

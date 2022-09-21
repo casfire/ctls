@@ -9,7 +9,7 @@
 package nistec
 
 import (
-	"crypto/internal/nistec/fiat"
+	"github.com/casfire/ctls/nistec/fiat"
 	"crypto/subtle"
 	"errors"
 	"sync"
